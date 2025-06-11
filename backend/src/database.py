@@ -12,20 +12,21 @@ class Database:
     """
     Handles SQLite3 database operations for the IR Thermal Monitoring System.
     """
-    def __init__(self, db_path: str = "ir_monitoring.db"):
+    def __init__(self, db_path: str = "ir_monitoring.db") -> None:
         self.db_path = db_path
         self.conn: Optional[sqlite3.Connection] = None
 
-    def connect(self):
+    def connect(self) -> None:
         """Open a connection to the SQLite database and apply PRAGMA settings."""
         self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        assert self.conn is not None
         self.conn.execute("PRAGMA journal_mode=WAL;")
         self.conn.execute("PRAGMA synchronous=NORMAL;")
         self.conn.execute("PRAGMA cache_size=10000;")
         self.conn.execute("PRAGMA temp_store=MEMORY;")
         logging.info("Database connected and PRAGMA set.")
 
-    def initialize_schema(self):
+    def initialize_schema(self) -> None:
         """Create all required tables and indexes if they do not exist."""
         schema = """
         CREATE TABLE IF NOT EXISTS zones (
@@ -72,6 +73,7 @@ class Database:
         CREATE INDEX IF NOT EXISTS idx_zones_active ON zones(id);
         CREATE INDEX IF NOT EXISTS idx_alarms_enabled ON alarms(enabled);
         """
+        assert self.conn is not None
         self.conn.executescript(schema)
         self.conn.commit()
         logging.info("Database schema initialized.")
@@ -79,6 +81,7 @@ class Database:
     @contextmanager
     def transaction(self) -> Iterator[sqlite3.Connection]:
         """Context manager for DB transactions with rollback on failure."""
+        assert self.conn is not None
         try:
             yield self.conn
             self.conn.commit()
@@ -87,12 +90,13 @@ class Database:
             logging.error(f"Transaction failed: {e}")
             raise
 
-    def execute_query(self, query: str, params: tuple = ()) -> Any:
+    def execute_query(self, query: str, params: tuple = ()) -> sqlite3.Cursor:
         """Execute a query and return the cursor."""
+        assert self.conn is not None
         cur = self.conn.execute(query, params)
         return cur
 
-    def close(self):
+    def close(self) -> None:
         """Close the database connection."""
         if self.conn:
             self.conn.close()

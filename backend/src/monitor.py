@@ -4,6 +4,7 @@ monitor.py
 System monitoring and health checks for IR Thermal Monitoring System.
 """
 import logging
+from typing import Any
 from backend.src.sensor import ThermalSensor
 from backend.src.database import Database
 from backend.src.frames import ThermalFrameBuffer
@@ -13,7 +14,7 @@ class SystemMonitor:
     """
     Aggregates health checks for sensor, database, frame buffer, and alarms.
     """
-    def __init__(self, sensor: ThermalSensor, db: Database, frame_buffer: ThermalFrameBuffer, alarms: AlarmManager):
+    def __init__(self, sensor: Any, db: Any, frame_buffer: Any, alarms: Any) -> None:
         self.sensor = sensor
         self.db = db
         self.frame_buffer = frame_buffer
@@ -31,15 +32,12 @@ class SystemMonitor:
 
     def check_database_health(self) -> bool:
         try:
-            self.db.connect()
-            self.db.conn.execute("SELECT 1;")
-            logging.info("Database health: OK.")
+            assert self.db.conn is not None
+            self.db.conn.execute("SELECT 1")
             return True
         except Exception as e:
             logging.error(f"Database health check failed: {e}")
             return False
-        finally:
-            self.db.close()
 
     def check_frame_buffer_health(self) -> bool:
         try:
@@ -59,7 +57,7 @@ class SystemMonitor:
             logging.error(f"Alarm system health check failed: {e}")
             return False
 
-    def health_report(self) -> dict:
+    def health_report(self) -> dict[str, bool]:
         return {
             "sensor": self.check_sensor_health(),
             "database": self.check_database_health(),

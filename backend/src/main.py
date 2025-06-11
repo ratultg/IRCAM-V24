@@ -13,7 +13,7 @@ load_dotenv()
 app = FastAPI(title="IR Thermal Monitoring API", version="1.0")
 
 # --- Argument Parsing ---
-def parse_args():
+def parse_args() -> tuple[argparse.Namespace, list[str]]:
     parser = argparse.ArgumentParser()
     parser.add_argument('--mocksensor', action='store_true', help='Use mock sensor with random data')
     return parser.parse_known_args()
@@ -49,31 +49,31 @@ class ZoneAverageResponse(BaseModel):
 
 # --- In-memory managers (replace with DB-backed in production) ---
 zones_manager = ZonesManager()
-_sensor_instance = None
+_sensor_instance: ThermalSensor | MockThermalSensor | None = None
 
-def get_sensor():
+def get_sensor() -> ThermalSensor | MockThermalSensor:
     global _sensor_instance
     if _sensor_instance is None:
         if os.getenv('MOCK_SENSOR', '0') == '1':
             _sensor_instance = MockThermalSensor()
         else:
             _sensor_instance = ThermalSensor()
+    assert _sensor_instance is not None
     return _sensor_instance
 
 # --- API Endpoints ---
 @app.get("/api/v1/thermal/real-time", response_model=ThermalFrameResponse)
-def get_real_time_frame():
+def get_real_time_frame() -> ThermalFrameResponse:
     frame = get_sensor().read_frame()
-    # In production, add timestamp from RTC or system clock
     from datetime import datetime
     return ThermalFrameResponse(timestamp=datetime.utcnow().isoformat(), frame=frame)
 
 @app.get("/api/v1/zones", response_model=List[ZoneResponse])
-def get_zones():
+def get_zones() -> list[ZoneResponse]:
     return [ZoneResponse(id=z.id, x=z.x, y=z.y, width=z.width, height=z.height, name=z.name, color=z.color) for z in zones_manager.get_zones()]
 
 @app.post("/api/v1/zones", response_model=ZoneResponse)
-def add_zone(zone: ZoneRequest):
+def add_zone(zone: ZoneRequest) -> ZoneResponse:
     try:
         zones_manager.add_zone(zone_id=zone.id, x=zone.x, y=zone.y, width=zone.width, height=zone.height, name=zone.name, color=zone.color)
         return ZoneResponse(id=zone.id, x=zone.x, y=zone.y, width=zone.width, height=zone.height, name=zone.name or f"Zone ({zone.x},{zone.y})", color=zone.color or "#FF0000")
@@ -81,7 +81,7 @@ def add_zone(zone: ZoneRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.delete("/api/v1/zones/{zone_id}")
-def delete_zone(zone_id: int):
+def delete_zone(zone_id: int) -> dict[str, str]:
     try:
         zones_manager.remove_zone(zone_id)
         return {"status": "deleted"}
@@ -89,7 +89,7 @@ def delete_zone(zone_id: int):
         raise HTTPException(status_code=404, detail=str(e))
 
 @app.get("/api/v1/zones/{zone_id}/average", response_model=ZoneAverageResponse)
-def get_zone_average(zone_id: int):
+def get_zone_average(zone_id: int) -> ZoneAverageResponse:
     frame = get_sensor().read_frame()
     try:
         avg = zones_manager.compute_zone_average(zone_id, frame)
@@ -98,5 +98,5 @@ def get_zone_average(zone_id: int):
         raise HTTPException(status_code=404, detail=str(e))
 
 @app.get("/api/v1/health")
-def health():
+def health() -> dict[str, str]:
     return {"status": "ok"}

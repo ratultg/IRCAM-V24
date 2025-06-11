@@ -10,26 +10,26 @@ class AlarmEvent:
     """
     Represents an alarm event (zone, temperature, timestamp, type).
     """
-    def __init__(self, alarm_id: int, zone_id: int, temperature: float, timestamp: str, event_type: str):
-        self.alarm_id = alarm_id
-        self.zone_id = zone_id
-        self.temperature = temperature
-        self.timestamp = timestamp
-        self.event_type = event_type
+    def __init__(self, alarm_id: int, zone_id: int, temperature: float, timestamp: str, event_type: str) -> None:
+        self.alarm_id: int = alarm_id
+        self.zone_id: int = zone_id
+        self.temperature: float = temperature
+        self.timestamp: str = timestamp
+        self.event_type: str = event_type
 
 class AlarmManager:
     """
     Manages alarm configurations, checks, and event logging.
     """
-    def __init__(self):
+    def __init__(self) -> None:
         self.alarms: Dict[int, Dict] = {}  # alarm_id -> config dict
         self.events: List[AlarmEvent] = []
 
-    def add_alarm(self, alarm_id: int, zone_id: int, threshold: float, enabled: bool = True):
+    def add_alarm(self, alarm_id: int, zone_id: int, threshold: float, enabled: bool = True) -> None:
         self.alarms[alarm_id] = {"zone_id": zone_id, "threshold": threshold, "enabled": enabled}
         logging.info(f"Alarm {alarm_id} added for zone {zone_id}.")
 
-    def remove_alarm(self, alarm_id: int):
+    def remove_alarm(self, alarm_id: int) -> None:
         if alarm_id in self.alarms:
             del self.alarms[alarm_id]
             logging.info(f"Alarm {alarm_id} removed.")
@@ -44,11 +44,11 @@ class AlarmManager:
                 return event
         return None
 
-    def log_event(self, event: AlarmEvent):
+    def log_event(self, event: AlarmEvent) -> None:
         self.events.append(event)
         logging.info(f"Alarm event logged: {event.__dict__}")
 
-    def notify(self, event: AlarmEvent, email: Optional[str] = None, webhook: Optional[str] = None):
+    def notify(self, event: AlarmEvent, email: Optional[str] = None, webhook: Optional[str] = None) -> None:
         # Placeholder for notification logic
         if email:
             logging.info(f"Sending email notification for event: {event.__dict__}")

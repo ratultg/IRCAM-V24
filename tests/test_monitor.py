@@ -36,6 +36,9 @@ def test_sensor_fail():
 
 def test_db_fail():
     class FailingDB(DummyDB):
-        def connect(self): raise Exception("fail")
+        @property
+        def conn(self):
+            raise RuntimeError("DB connection failed")
+        def connect(self): raise RuntimeError("fail")
     monitor = SystemMonitor(DummySensor(), FailingDB(), DummyFrameBuffer(), DummyAlarms())
     assert not monitor.check_database_health()
