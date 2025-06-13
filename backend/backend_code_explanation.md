@@ -1,5 +1,47 @@
 # IR Thermal Monitoring System Backend: Subsystem Logic Overviews (Non-Programmer Friendly)
 
+## Quick Start
+1. **Clone the repository:**
+   ```powershell
+   git clone <your-repo-url>
+   cd IRCAM V24
+   ```
+   ```bash
+   git clone <your-repo-url>
+   cd IRCAM\ V24
+   ```
+2. **Create and activate a virtual environment:**
+   ```powershell
+   python -m venv .venv
+   .venv\Scripts\activate
+   ```
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   ```
+3. **Install dependencies:**
+   ```powershell
+   pip install -r requirements.txt
+   pip install -r requirements-dev.txt
+   ```
+   ```bash
+   pip install -r requirements.txt
+   pip install -r requirements-dev.txt
+   ```
+4. **Run the backend with the mock sensor (no hardware required):**
+   ```powershell
+   $env:MOCK_SENSOR=1
+   uvicorn backend.src.main:app --reload
+   ```
+   ```bash
+   export MOCK_SENSOR=1
+   uvicorn backend.src.main:app --reload
+   ```
+5. **Open the API docs:**
+   - Visit [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) in your browser.
+
+---
+
 This document explains how each part of the backend system works, step by step, in plain language. It is designed for anyone who wants to understand the system, even without a programming background.
 
 ---
@@ -22,6 +64,8 @@ This part of the system is responsible for reading temperature data from a speci
 - It takes a thermal snapshot on request.
 - If something goes wrong, it tries again and keeps a record of the problem.
 
+[See detailed class/method table in the Appendix: [Sensor Handling](#sensor-handling-1)]
+
 ---
 
 ## 2. Frame Buffering
@@ -41,6 +85,8 @@ This is like a rolling photo album that always keeps the most recent thermal sna
 - The system always keeps the latest 10 minutes of thermal images.
 - New images replace the oldest ones.
 - It can quickly find recent images if needed.
+
+[See detailed class/method table in the Appendix: [Frame Buffering](#frame-buffering-1)]
 
 ---
 
@@ -62,6 +108,8 @@ Zones are special areas on the thermal image that you want to watch closely (for
 - The system remembers these areas.
 - It checks the temperature in each area every time it takes a new snapshot.
 
+[See detailed class/method table in the Appendix: [Zone Management](#zone-management-1)]
+
 ---
 
 ## 4. Alarm System
@@ -77,14 +125,17 @@ This part watches for temperatures that are too high in your zones and alerts yo
 3. **Triggering an Alarm**
    - If a zone is too hot, the system records an alarm event with details (when, where, how hot).
 4. **Sending Alerts**
-   - The system is ready to send alerts (like emails), but this is currently just a placeholder.
+   - The system sends real email notifications (via SMTP) to configured recipients when an alarm is triggered. Notification settings are persistent and configurable via API. Delivery errors are logged.
 5. **Starting Event Recording**
    - When an alarm happens, the system prepares to save extra data before and after the event.
 
 ### In Simple Terms
 - You set temperature limits for important areas.
 - The system checks these limits every time.
-- If a limit is crossed, it records an alarm and prepares to save more data.
+- If a limit is crossed, it records an alarm and sends an email notification.
+- All notification settings are persistent and configurable.
+
+[See detailed class/method table in the Appendix: [Alarm System](#alarm-system-1)]
 
 ---
 
@@ -107,6 +158,8 @@ This part saves a "movie" of what happened before and after an alarm.
 - When something important happens, the system saves what it saw before and after.
 - This lets you review the whole event later, like watching a replay.
 
+[See detailed class/method table in the Appendix: [Event-Triggered Frame Storage](#event-triggered-frame-storage-1)]
+
 ---
 
 ## 6. Database & Persistence
@@ -125,6 +178,8 @@ This is the system’s memory, where it saves all important information so nothi
 ### In Simple Terms
 - All important data is saved in a safe, organized way.
 - The system is designed to avoid losing data, even if something goes wrong.
+
+[See detailed class/method table in the Appendix: [Database & Persistence](#database--persistence-1)]
 
 ---
 
@@ -145,6 +200,8 @@ This is how other programs (like a web dashboard) talk to the backend to get dat
 - The backend can be controlled and monitored from other programs or dashboards.
 - It always checks that requests are safe and make sense.
 
+[See detailed class/method table in the Appendix: [API Layer](#api-layer-1)]
+
 ---
 
 ## 8. System Health Monitoring
@@ -162,6 +219,8 @@ This part checks that all other parts of the system are working correctly.
 
 ### In Simple Terms
 - The system keeps an eye on itself and reports if anything is wrong.
+
+[See detailed class/method table in the Appendix: [System Health Monitoring](#system-health-monitoring-1)]
 
 ---
 
@@ -181,99 +240,481 @@ This ensures the system works correctly and is reliable.
 ### In Simple Terms
 - The system is thoroughly tested to make sure it works and is reliable.
 
----
-
-## Appendix: Classes, Methods, and Functions Explained
-
-Below is a table for each subsystem listing the main classes, methods, and functions, along with a plain-language explanation of what each does.
-
-### 1. Sensor Handling
-| Name                   | Type     | What It Does                                                                 |
-|------------------------|----------|------------------------------------------------------------------------------|
-| ThermalSensor          | Class    | Talks to the real MLX90640 sensor to get temperature data.                   |
-| __init__               | Method   | Sets up the sensor and prepares it for use.                                  |
-| read_frame             | Method   | Gets a new thermal snapshot (768 values) from the sensor.                    |
-| MockThermalSensor      | Class    | Pretends to be a sensor, generating fake/random temperature data for testing. |
-| __init__ (Mock)        | Method   | Sets up the mock sensor with default temperature and noise.                  |
-| read_frame (Mock)      | Method   | Returns a fake thermal snapshot (random values).                             |
-
-### 2. Frame Buffering
-| Name                   | Type     | What It Does                                                                 |
-|------------------------|----------|------------------------------------------------------------------------------|
-| ThermalFrameBuffer     | Class    | Stores the most recent thermal snapshots in a rolling memory buffer.          |
-| add_frame              | Method   | Adds a new snapshot to the buffer.                                           |
-| get_last_n_frames      | Method   | Retrieves the most recent N snapshots.                                       |
-
-### 3. Zone Management
-| Method/Class            | Type     | Description                                                                 |
-|-------------------------|----------|-----------------------------------------------------------------------------|
-| add_zone                | Method   | Adds a new zone (rectangle) to watch. Now supports naming and color-coding each zone (fields: name, color). |
-| remove_zone             | Method   | Removes a zone from the list.                                               |
-| get_zones               | Method   | Returns all currently defined zones, including their names and colors (fields: name, color). |
-| compute_zone_average    | Method   | Calculates the average temperature in a zone for a given snapshot.          |
-| Zone                    | Class    | Represents a single rectangular area on the image, with a name and color.   |
-
-
-### 4. Alarm System
-| Name                   | Type     | What It Does                                                                 |
-|------------------------|----------|------------------------------------------------------------------------------|
-| AlarmManager           | Class    | Watches zones for high temperatures and triggers alarms.                     |
-| check_thresholds       | Method   | Checks if any zone is too hot and should trigger an alarm.                   |
-| log_event              | Method   | Records an alarm event in the system.                                        |
-| notify                 | Method   | Sends an alert (currently a placeholder for future use).                     |
-| AlarmEvent             | Class    | Represents a single alarm event (when, where, how hot, etc.).                |
-
-### 5. Event-Triggered Frame Storage
-| Name                   | Type     | What It Does                                                                 |
-|------------------------|----------|------------------------------------------------------------------------------|
-| EventTriggeredStorage  | Class    | Handles saving snapshots before and after an alarm event.                    |
-| trigger_event          | Method   | Starts the process of saving pre- and post-alarm snapshots.                  |
-
-### 6. Database & Persistence
-| Name                   | Type     | What It Does                                                                 |
-|------------------------|----------|------------------------------------------------------------------------------|
-| Database               | Class    | Manages saving and loading all data (snapshots, events, alarms, zones).      |
-| connect                | Method   | Opens a connection to the database.                                          |
-| initialize_schema      | Method   | Sets up the tables and structure in the database.                            |
-| execute_query          | Method   | Runs a command to save or get data.                                          |
-| close                  | Method   | Closes the connection to the database.                                       |
-
-### 7. API Layer
-| Name                   | Type     | What It Does                                                                 |
-|------------------------|----------|------------------------------------------------------------------------------|
-| FastAPI app            | Object   | The main web server that handles requests from other programs.               |
-| get_real_time_frame    | Function | Returns the latest thermal snapshot.                                         |
-| add_zone               | Function | Lets users add a new zone via the web/API.                                   |
-| delete_zone            | Function | Lets users remove a zone via the web/API.                                    |
-| get_zone_average       | Function | Returns the average temperature for a zone.                                  |
-| health                 | Function | Returns the current health status of the system.                             |
-
-### API Endpoints Overview
-| Method | Path                              | Purpose/Description                                 |
-|--------|-----------------------------------|-----------------------------------------------------|
-| GET    | /api/v1/thermal/real-time         | Get the latest thermal snapshot (768 values).        |
-| GET    | /api/v1/zones                     | List all defined zones (with name and color).        |
-| POST   | /api/v1/zones                     | Create a new zone (provide id, x, y, width, height, name, color). |
-| DELETE | /api/v1/zones/{zone_id}           | Remove a zone by its ID.                            |
-| GET    | /api/v1/zones/{zone_id}/average   | Get the average temperature for a specific zone.     |
-| GET    | /api/v1/health                    | Get the current health status of the system.         |
-
-**How to Access:**
-- All endpoints are available via HTTP (typically from a web dashboard, script, or tool like curl/Postman).
-- For GET requests, simply visit the URL or use a tool to fetch the data.
-- For POST/DELETE, send a JSON payload (for POST) or specify the zone ID in the URL (for DELETE/average).
-- Example: To add a zone, send a POST request to `/api/v1/zones` with a JSON body containing the zone details.
-
-### 8. System Health Monitoring
-| Name                   | Type     | What It Does                                                                 |
-|------------------------|----------|------------------------------------------------------------------------------|
-| SystemMonitor          | Class    | Checks if all parts of the system are working correctly.                     |
-| check_sensor_health    | Method   | Checks if the sensor is working.                                             |
-| check_database_health  | Method   | Checks if the database is working.                                           |
-| check_frame_buffer_health| Method | Checks if the frame buffer is working.                                       |
-| check_alarm_system_health| Method | Checks if the alarm system is working.                                       |
-| health_report          | Method   | Combines all health checks into one report.                                  |
+[See detailed class/method table in the Appendix: [Testing & Quality Assurance](#testing--quality-assurance-1)]
 
 ---
 
-This appendix should help you quickly find what each part of the code does, in plain language.
+## 10. Analytics & Reporting
+
+### What is it?
+This part provides advanced data analysis, reporting, and export features for historical and real-time thermal data.
+
+### How does it work?
+1. **Generating Analytics**
+   - The system can compute heatmaps, trends, and detect anomalies for any zone and time range via `/api/v1/analytics/heatmap`, `/api/v1/analytics/trends`, and `/api/v1/analytics/anomalies`.
+2. **Exporting Data**
+   - Users can export frame data as CSV, including per-frame statistics, for further analysis using `/api/v1/frames/export?overlay=stats`.
+3. **Generating Reports**
+   - The system can generate summary, trend, and anomaly count reports for any zone and time range via `/api/v1/reports`.
+
+### In Simple Terms
+- The backend can analyze, summarize, and export thermal data for deeper insights.
+- All analytics and reporting features are available via API endpoints.
+
+[See detailed class/method table in the Appendix: [Analytics & Reporting](#analytics--reporting-1)]
+
+---
+
+## 11. Alarm/Event Management & Frame Export
+
+### What is it?
+This part manages alarm events, event frame retrieval, and provides access to raw and processed frame data for frontend and analysis use.
+
+### How does it work?
+1. **Alarm History and Acknowledge**
+   - Retrieve a list of all alarm events and their details using `/api/v1/alarms/history`.
+   - Acknowledge or reset alarms using `/api/v1/alarms/acknowledge` (POST).
+   - When an alarm is triggered, a real email notification is sent to all configured recipients (see Notifications section).
+2. **Event Frame Retrieval and Export**
+   - Retrieve all frames associated with a specific event using `/api/v1/events/{event_id}/frames` (JSON metadata) and `/api/v1/events/{event_id}/frames.png` (PNG image export).
+   - Retrieve all frame blobs for an event (base64-encoded, with metadata) using `/api/v1/events/{event_id}/frames/blobs`.
+   - (Optional) Retrieve a single frame blob using `/api/v1/frames/{frame_id}/blob` (if implemented).
+3. **Frame Export for Analysis**
+   - Export all frames (with optional overlays/statistics) as CSV for further analysis or reporting.
+
+### In Simple Terms
+- You can view, acknowledge, and manage alarm events.
+- You can retrieve and export all frames for any event, including as images or raw data.
+- The backend supports all data needed for frontend video/gif generation and advanced analytics.
+
+---
+
+## 12. Frontend Integration & Advanced Features
+
+### What is it?
+The backend is designed to support a feature-rich frontend, including event video/gif generation, advanced analytics, and future extensibility.
+
+### How does it work?
+- All endpoints provide data in formats suitable for direct frontend use (JSON, CSV, PNG, base64 blobs).
+- The frontend can generate event videos/gifs by retrieving event frames and assembling them client-side.
+- Backend performance is optimized for analytics and export; numpy is used for speed, and further optimizations are possible if needed.
+- Optional advanced features (notification delivery, advanced event/alarm management, log retrieval, user management) can be added as needed.
+
+### In Simple Terms
+- The backend is ready for modern frontend features, including video/gif generation from event frames.
+- All core and advanced APIs are implemented, tested, and documented. Optional features can be prioritized as needed.
+
+---
+
+# Appendix: Classes, Methods, and Functions
+## Overview
+This appendix provides detailed information about the classes, methods, and functions used in the IR Thermal Monitoring System, including their purpose, parameters, and usage.
+
+## Legend
+- **Parameters:** Arguments passed to the method/function.
+- **Returns:** The type of value returned by the method/function.
+- **Color Coding:**
+    - <span style="color: #00AA00">Green</span>: Core logic
+    - <span style="color: #0077CC">Blue</span>: API/Interface
+    - <span style="color: #CC7700">Orange</span>: Persistence/Storage
+
+## Components
+- **Class Diagrams:** Visual representations of the system classes and their relationships.
+
+### Sensor Handling {#sensor-handling-1}
+```mermaid
+classDiagram
+    class ThermalSensor {
+        +read_frame()
+    }
+    class MockThermalSensor {
+        +read_frame()
+    }
+    ThermalSensor <|-- MockThermalSensor
+```
+| Class             | Method        | Parameters | Returns | Description                                      |
+|-------------------|--------------|------------|---------|--------------------------------------------------|
+| ThermalSensor     | read_frame() | None       | list[float] | Gets a new thermal snapshot (768 values).        |
+| MockThermalSensor | read_frame() | None       | list[float] | Returns a fake thermal snapshot for testing.     |
+
+---
+
+### Frame Buffering {#frame-buffering-1}
+```mermaid
+classDiagram
+    class ThermalFrameBuffer {
+        +add_frame()
+        +get_last_n_frames()
+    }
+```
+| Class              | Method              | Parameters | Returns | Description                                      |
+|--------------------|--------------------|------------|---------|--------------------------------------------------|
+| ThermalFrameBuffer | add_frame()        | frame: list[float] | None | Adds a new snapshot to the buffer.               |
+| ThermalFrameBuffer | get_last_n_frames()| n: int     | list[list[float]] | Retrieves the most recent N snapshots.           |
+
+---
+
+### Zone Management {#zone-management-1}
+```mermaid
+classDiagram
+    class Zone {
+        +id: int
+        +x: int
+        +y: int
+        +width: int
+        +height: int
+        +name: str
+        +color: str
+    }
+    class ZoneManager {
+        +add_zone()
+        +remove_zone()
+        +get_zones()
+    }
+    class ZoneDatabase {
+        +save_zone()
+        +load_zones()
+    }
+    ZoneManager --> Zone
+    ZoneManager --> ZoneDatabase
+```
+| Class         | Method        | Parameters | Returns | Description                                      |
+|---------------|--------------|------------|---------|--------------------------------------------------|
+| ZoneManager   | add_zone()   | zone: Zone | None    | Adds a new zone with name and color.              |
+| ZoneManager   | remove_zone()| zone_id: int | None   | Removes a zone by ID.                            |
+| ZoneManager   | get_zones()  | None       | list[Zone] | Retrieves all defined zones.                      |
+| ZoneDatabase  | save_zone()  | zone: Zone | None    | Persists a zone to the database.                  |
+| ZoneDatabase  | load_zones() | None       | list[Zone] | Loads all zones from the database.                |
+
+---
+
+### Alarm System {#alarm-system-1}
+```mermaid
+classDiagram
+    class AlarmManager {
+        +check_thresholds()
+        +trigger_alarm()
+        +get_alarm_history()
+    }
+    class NotificationService {
+        +send_alert()
+    }
+    AlarmManager --> NotificationService
+    AlarmManager --> Zone
+```
+| Class              | Method            | Parameters | Returns | Description                                      |
+|--------------------|------------------|------------|---------|--------------------------------------------------|
+| AlarmManager       | check_thresholds()| None       | list[AlarmEvent] | Checks if any zone is too hot.                   |
+| AlarmManager       | trigger_alarm()   | zone_id: int, temp: float | AlarmEvent | Triggers an alarm for a zone.                    |
+| AlarmManager       | get_alarm_history()| None      | list[AlarmEvent] | Retrieves alarm history.                        |
+| NotificationService| send_alert()      | message: str | None  | Sends an alert/notification.                     |
+
+---
+
+### Event-Triggered Frame Storage {#event-triggered-frame-storage-1}
+```mermaid
+classDiagram
+    class EventTriggeredStorage {
+        +trigger_event()
+        +store_frame()
+        +get_stored_frames()
+    }
+    EventTriggeredStorage --> ThermalFrameBuffer
+    EventTriggeredStorage --> Database
+```
+| Class                 | Method           | Parameters | Returns | Description                                      |
+|-----------------------|------------------|------------|---------|--------------------------------------------------|
+| EventTriggeredStorage | trigger_event()  | event: AlarmEvent | None | Saves pre- and post-alarm snapshots.             |
+| EventTriggeredStorage | store_frame()    | frame: list[float] | None | Stores a frame to persistent storage.            |
+| EventTriggeredStorage | get_stored_frames()| event_id: int | list[list[float]] | Retrieves stored frames for an event.          |
+
+---
+
+### Database & Persistence {#database--persistence-1}
+```mermaid
+classDiagram
+    class Database {
+        +connect()
+        +execute_query()
+        +close()
+    }
+    class FileSystemManager {
+        +save_file()
+        +load_file()
+    }
+```
+| Class             | Method         | Parameters | Returns | Description                                      |
+|-------------------|---------------|------------|---------|--------------------------------------------------|
+| Database          | connect()      | None       | Connection | Opens a connection to the database.              |
+| Database          | execute_query()| query: str | Any    | Runs a command to save or get data.              |
+| Database          | close()        | None       | None   | Closes the database connection.                  |
+| FileSystemManager | save_file()    | path: str, data: Any | None | Saves data to a file.                            |
+| FileSystemManager | load_file()    | path: str  | Any    | Loads data from a file.                          |
+
+---
+
+### API Layer {#api-layer-1}
+```mermaid
+classDiagram
+    class APIRouter {
+        +route_request()
+    }
+    class APIController {
+        +handle_request()
+    }
+    APIRouter --> APIController
+```
+| Class         | Method         | Parameters | Returns | Description                                      |
+|--------------|---------------|------------|---------|--------------------------------------------------|
+| APIRouter    | route_request()| request: Request | Response | Routes incoming API requests.                    |
+| APIController| handle_request()| request: Request | Response | Handles business logic for API endpoints.        |
+
+---
+
+### System Health Monitoring {#system-health-monitoring-1}
+```mermaid
+classDiagram
+    class HealthChecker {
+        +check_health()
+        +get_status()
+    }
+    class StatusDashboard {
+        +display_status()
+    }
+    HealthChecker --> StatusDashboard
+```
+| Class           | Method         | Parameters | Returns | Description                                      |
+|-----------------|---------------|------------|---------|--------------------------------------------------|
+| HealthChecker   | check_health() | None       | dict    | Monitors health of subsystems.                   |
+| HealthChecker   | get_status()   | None       | dict    | Retrieves current system status.                 |
+| StatusDashboard | display_status()| status: dict | None  | Shows system health to users/admins.            |
+
+---
+
+### Testing & Quality Assurance {#testing--quality-assurance-1}
+```mermaid
+classDiagram
+    class TestSuite {
+        +run_tests()
+    }
+    class CICDPipeline {
+        +deploy()
+        +run_ci()
+    }
+    TestSuite --> CICDPipeline
+```
+| Class        | Method      | Parameters | Returns | Description                                      |
+|--------------|------------|------------|---------|--------------------------------------------------|
+| TestSuite    | run_tests() | None      | bool    | Runs automated tests for the system.             |
+| CICDPipeline | deploy()    | env: str  | None    | Deploys the system to staging/production.        |
+| CICDPipeline | run_ci()    | None      | None    | Runs continuous integration pipeline.            |
+
+---
+
+### Analytics & Reporting {#analytics--reporting-1}
+```mermaid
+classDiagram
+    class AnalyticsEngine {
+        +compute_heatmap()
+        +compute_trend()
+        +detect_anomalies()
+        +get_frame_stats()
+        +generate_report()
+    }
+```
+| Class           | Method             | Parameters                        | Returns         | Description                                      |
+|-----------------|--------------------|------------------------------------|-----------------|--------------------------------------------------|
+| AnalyticsEngine | compute_heatmap()  | zone_id: int, start, end          | dict            | Computes a heatmap for a zone and time range.    |
+| AnalyticsEngine | compute_trend()    | zone_id: int, start, end          | dict            | Computes temperature trends for a zone.          |
+| AnalyticsEngine | detect_anomalies() | zone_id: int, start, end          | dict            | Detects anomalies in zone temperature data.      |
+| AnalyticsEngine | get_frame_stats()  | frame_id: int                     | dict            | Computes statistics for a single frame.          |
+| AnalyticsEngine | generate_report()  | type, zone_id, start, end         | dict            | Generates summary, trend, or anomaly reports.    |
+
+---
+
+## API Endpoint Examples
+
+Below are example requests and responses for each API endpoint. Replace values as needed for your use case.
+
+### `GET /api/v1/thermal/real-time`
+**Request:**
+```powershell
+Invoke-RestMethod -Uri http://127.0.0.1:8000/api/v1/thermal/real-time
+```
+**Response:**
+```json
+{
+  "frame": [23.1, 23.2, ...],
+  "timestamp": "2025-06-10T12:34:56Z"
+}
+```
+
+### `GET /api/v1/zones`
+**Request:**
+```bash
+curl http://127.0.0.1:8000/api/v1/zones
+```
+**Response:**
+```json
+[
+  {"id": 1, "x": 0, "y": 0, "width": 2, "height": 2, "name": "Test Zone", "color": "#00FF00"}
+]
+```
+
+### `POST /api/v1/zones`
+**Request:**
+```json
+{
+  "id": 1,
+  "x": 0,
+  "y": 0,
+  "width": 2,
+  "height": 2,
+  "name": "Test Zone",
+  "color": "#00FF00"
+}
+```
+**Response:**
+```json
+{"success": true, "zone": {"id": 1, "x": 0, "y": 0, "width": 2, "height": 2, "name": "Test Zone", "color": "#00FF00"}}
+```
+
+### `DELETE /api/v1/zones/{zone_id}`
+**Request:**
+```bash
+curl -X DELETE http://127.0.0.1:8000/api/v1/zones/1
+```
+**Response:**
+```json
+{"success": true}
+```
+
+### `GET /api/v1/zones/{zone_id}/average`
+**Request:**
+```bash
+curl http://127.0.0.1:8000/api/v1/zones/1/average
+```
+**Response:**
+```json
+{"zone_id": 1, "average": 24.5}
+```
+
+### `GET /api/v1/health`
+**Request:**
+```bash
+curl http://127.0.0.1:8000/api/v1/health
+```
+**Response:**
+```json
+{"status": "ok", "details": {"sensor": "ok", "database": "ok"}}
+```
+
+### `GET /api/v1/analytics/heatmap`
+**Request:**
+```bash
+curl "http://127.0.0.1:8000/api/v1/analytics/heatmap?zone_id=1&start_time=2025-06-10T00:00:00Z&end_time=2025-06-10T23:59:59Z"
+```
+**Response:**
+```json
+{"zone_id": 1, "width": 32, "height": 24, "heatmap": [23.1, 23.2, ...]}
+```
+
+### `GET /api/v1/analytics/trends`
+**Request:**
+```bash
+curl "http://127.0.0.1:8000/api/v1/analytics/trends?zone_id=1&start_time=2025-06-10T00:00:00Z&end_time=2025-06-10T23:59:59Z"
+```
+**Response:**
+```json
+{"zone_id": 1, "timestamps": ["2025-06-10T12:00:00Z", ...], "values": [23.5, ...]}
+```
+
+### `GET /api/v1/analytics/anomalies`
+**Request:**
+```bash
+curl "http://127.0.0.1:8000/api/v1/analytics/anomalies?zone_id=1&start_time=2025-06-10T00:00:00Z&end_time=2025-06-10T23:59:59Z"
+```
+**Response:**
+```json
+{"zone_id": 1, "anomalies": [{"timestamp": "2025-06-10T12:34:56Z", "value": 30.2}]}
+```
+
+### `GET /api/v1/reports`
+**Request:**
+```bash
+curl "http://127.0.0.1:8000/api/v1/reports?report_type=summary&zone_id=1&start_time=2025-06-10T00:00:00Z&end_time=2025-06-10T23:59:59Z"
+```
+**Response:**
+```json
+{"report_type": "summary", "summary": {"mean": 24.5, "min": 22.0, "max": 27.0}}
+```
+
+### `GET /api/v1/alarms/history`
+**Request:**
+```bash
+curl http://127.0.0.1:8000/api/v1/alarms/history
+```
+**Response:**
+```json
+[
+  {"alarm_id": 1, "zone_id": 1, "timestamp": "2025-06-10T12:34:56Z", "acknowledged": false, "max_temp": 30.2}
+]
+```
+
+### `POST /api/v1/alarms/acknowledge`
+**Request:**
+```json
+{"alarm_id": 1}
+```
+**Response:**
+```json
+{"success": true, "alarm_id": 1, "acknowledged": true}
+```
+
+### `GET /api/v1/events/{event_id}/frames`
+**Request:**
+```bash
+curl http://127.0.0.1:8000/api/v1/events/123/frames
+```
+**Response:**
+```json
+{"event_id": 123, "frames": [{"frame_id": 1, "timestamp": "2025-06-10T12:34:56Z"}, ...]}
+```
+
+### `GET /api/v1/events/{event_id}/frames.png`
+**Request:**
+```bash
+curl http://127.0.0.1:8000/api/v1/events/123/frames.png --output event_frames.png
+```
+**Response:**
+Binary PNG image containing all event frames.
+
+### `GET /api/v1/events/{event_id}/frames/blobs`
+**Request:**
+```bash
+curl http://127.0.0.1:8000/api/v1/events/123/frames/blobs
+```
+**Response:**
+```json
+{"event_id": 123, "frames": [{"frame_id": 1, "timestamp": "2025-06-10T12:34:56Z", "blob": "...base64..."}, ...]}
+```
+
+### `GET /api/v1/frames/export?overlay=stats`
+**Request:**
+```bash
+curl "http://127.0.0.1:8000/api/v1/frames/export?overlay=stats&start_time=2025-06-10T00:00:00Z&end_time=2025-06-10T23:59:59Z"
+```
+**Response:**
+CSV file with per-frame statistics (mean, min, max, std, etc.)
+
+---
+
+> **Docstring Reference:** For the most up-to-date details, always check the in-code docstrings and the FastAPI `/docs` interface.
+
+---
+
+## Advanced/Optional Features
+- Real email notification delivery is fully implemented and tested. Configure SMTP settings via environment variables or notification config (Gmail App Passwords supported).
+- Notification delivery, advanced event/alarm management, log retrieval, and user management can be further extended as needed.
+- Test data insertion is available for demo purposes (`insert_test_data.py`).
+- The backend is ready for further extension and frontend integration.

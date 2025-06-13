@@ -153,27 +153,30 @@ Response JSON:
 
 ---
 
-## Testing & CI
-- Run all tests:
-  ```sh
-  pytest --cov=backend/src
-  ```
-- Lint, format, and type-check:
-  ```sh
-  flake8 backend/src
-  black --check backend/src
-  mypy backend/src
-  ```
-- All tests must pass and coverage must be ≥85% before merging.
+## Backend Features
+- Persistent storage for zones, alarms, notifications, and event frames (SQLite)
+- All API endpoints use dependency injection for testable, isolated database usage
+- Automated tests for all persistent features, including event frame APIs
+- Test suite runs in full isolation (no shared state)
+- Event frame and alarm event APIs are fully covered by integration tests
 
----
+## Testing & CI
+To run all tests and check coverage:
+```powershell
+pytest --cov=backend/src --disable-warnings
+```
+To lint, format, and type-check:
+```powershell
+flake8 backend/src
+black --check backend/src
+mypy backend/src
+```
+All tests must pass and coverage must be ≥85% before merging.
 
 ## Security & Configuration
-- No hardcoded credentials: use environment variables or secure storage
-- All inputs are validated and type-checked
+- No hardcoded credentials: uses environment variables or secure storage
+- All API and DB inputs are validated and type-checked
 - Logging at appropriate levels (INFO, WARNING, ERROR)
-
----
 
 ## Reference & Documentation
 - See `copilot_py_reference.md` for a living reference of all modules/classes

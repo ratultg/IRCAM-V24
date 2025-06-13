@@ -16,8 +16,12 @@ class DummyDB:
         def _tx():
             yield self
         return _tx()
-    def execute_query(self, query, params):
+    def execute_query(self, query: str, params: tuple = ()):  # Add default param
         self.persisted.append(params)
+    def __enter__(self):
+        return self
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
 
 import datetime
 
@@ -51,3 +55,59 @@ def test_event_triggered_storage():
     # After post_event_frames, buffer should be cleared
     assert not storage._event_active
     assert len(db.persisted) == 4
+
+def test_event_frames_api(tmp_path):
+    # Integration test: insert frames, then fetch via API endpoints
+    import sqlite3
+    import numpy as np
+    from fastapi.testclient import TestClient
+    import tempfile
+    from backend.src.database import Database
+    from backend.src.main import app, get_db
+    # Use a temp DB and re-init schema for isolation
+    tf = tempfile.NamedTemporaryFile(delete=False)
+    try:
+        db = Database(tf.name)
+        db.connect()
+        db.initialize_schema()
+        # Insert a zone so that zone_id=1 is valid for event/frames
+        db.execute_query("INSERT INTO zones (id, name, color) VALUES (?, ?, ?)", (1, 'Test Zone', '#00FF00'))
+        # Override FastAPI dependency
+        app.dependency_overrides[get_db] = lambda: db
+        client = TestClient(app)
+        event_id = 123
+        db.execute_query("INSERT INTO alarm_events (id, zone_id, timestamp, temperature, alarm_id) VALUES (?, ?, ?, ?, ?)", (event_id, 1, "2025-06-12T12:00:00Z", 42.0, 1))
+        for i in range(2):
+            arr = (np.ones((24,32), dtype=np.float32) * (i+1)).tobytes()
+            db.execute_query("INSERT INTO thermal_frames (event_id, timestamp, frame, frame_size) VALUES (?, ?, ?, ?)", (event_id, f"2025-06-12T12:00:0{i}Z", arr, len(arr)))
+        resp = client.get(f"/api/v1/events/{event_id}/frames")
+        assert resp.status_code == 200
+        frames = resp.json()
+        assert len(frames) == 2
+        assert frames[0]["event_id"] == event_id
+        resp = client.get(f"/api/v1/events/{event_id}/frames.png")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "image/png"
+        db.close()
+    finally:
+        tf.close()
+        os.unlink(tf.name)
+        app.dependency_overrides.pop(get_db, None)
+
+def test_compute_heatmap_trend_anomalies():
+    from backend.src.frames import compute_heatmap, compute_trend, detect_anomalies
+    # Simulate 10 data points
+    data = [{"timestamp": f"2025-06-12T12:00:0{i}Z", "temperature": 20.0 + i, "zone_id": 1} for i in range(10)]
+    # Heatmap
+    heatmap = compute_heatmap(data, 32, 24)
+    assert len(heatmap) == 24 and len(heatmap[0]) == 32
+    # Trend
+    ts, vals = compute_trend(data)
+    assert len(ts) == 10 and len(vals) == 10
+    # Anomalies (none expected)
+    anomalies = detect_anomalies(data)
+    assert isinstance(anomalies, list)
+    # Add an outlier
+    data.append({"timestamp": "2025-06-12T12:00:10Z", "temperature": 100.0, "zone_id": 1})
+    anomalies = detect_anomalies(data)
+    assert any(a["temperature"] == 100.0 for a in anomalies)

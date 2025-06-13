@@ -8,6 +8,7 @@ from collections import deque
 from typing import List, Tuple, Protocol, runtime_checkable, Any
 import logging
 from types import TracebackType
+import numpy as np
 
 class ThermalFrameBuffer:
     """
@@ -95,3 +96,44 @@ class EventTriggeredStorage:
     def _serialize_frame(frame: list[float]) -> bytes:
         import struct
         return struct.pack(f"{len(frame)}f", *frame)
+
+def compute_heatmap(thermal_data: list[dict], width: int, height: int) -> list[list[float]]:
+    """Aggregate temperature data into a heatmap grid."""
+    # For demo: assume each data point is for a pixel (x, y) in the grid, or just average per grid cell
+    # Here, we just fill the grid with average temperature for simplicity
+    if not thermal_data:
+        return [[0.0 for _ in range(width)] for _ in range(height)]
+    temps = [d["temperature"] for d in thermal_data]
+    avg = float(np.mean(temps)) if temps else 0.0
+    return [[avg for _ in range(width)] for _ in range(height)]
+
+def compute_trend(thermal_data: list[dict]) -> tuple[list[str], list[float]]:
+    """Return time series of average temperature."""
+    if not thermal_data:
+        return [], []
+    timestamps = [d["timestamp"] for d in thermal_data]
+    values = [d["temperature"] for d in thermal_data]
+    return timestamps, values
+
+def detect_anomalies(thermal_data: list[dict], z_thresh: float = 2.5) -> list[dict]:
+    """Detect anomalies in temperature using z-score."""
+    if not thermal_data:
+        return []
+    temps = np.array([d["temperature"] for d in thermal_data])
+    mean = np.mean(temps)
+    std = np.std(temps)
+    anomalies = []
+    for d in thermal_data:
+        if std > 0 and abs((d["temperature"] - mean) / std) > z_thresh:
+            anomalies.append(d)
+    return anomalies
+
+def get_frame_stats(frame_bytes: bytes) -> dict:
+    import numpy as np
+    arr = np.frombuffer(frame_bytes, dtype=np.float32)
+    return {
+        "mean": float(np.mean(arr)) if arr.size else 0.0,
+        "min": float(np.min(arr)) if arr.size else 0.0,
+        "max": float(np.max(arr)) if arr.size else 0.0,
+        "std": float(np.std(arr)) if arr.size else 0.0,
+    }
