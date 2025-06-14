@@ -12,14 +12,6 @@ try:
     import smbus2
 except ImportError:
     smbus2 = None
-try:
-    import board
-    import busio
-    from adafruit_mlx90640 import MLX90640
-except ImportError:
-    board = None
-    busio = None
-    MLX90640 = None
 
 
 class ThermalSensor:
@@ -39,8 +31,16 @@ class ThermalSensor:
         Raises:
             RuntimeError: If required libraries are not installed or I2C bus cannot be opened.
         """
-        if MLX90640 is None or board is None or busio is None:
-            raise RuntimeError("Adafruit MLX90640 dependencies not installed; install via 'pip install adafruit-circuitpython-mlx90640'")
+        try:
+            import board
+            import busio
+            from adafruit_mlx90640 import MLX90640
+        except ImportError as e:
+            raise RuntimeError("Required hardware libraries not installed or not supported on this platform.") from e
+        self.board = board
+        self.busio = busio
+        self.MLX90640 = MLX90640
+
         self.bus_number = bus
         self.address = address
         self.max_retries = max_retries

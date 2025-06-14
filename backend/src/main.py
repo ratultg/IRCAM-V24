@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import List, Optional
 import os
+os.environ['MOCK_SENSOR'] = '1'
 from backend.src.sensor import ThermalSensor, MockThermalSensor
 from backend.src.zones import ZonesManager
 from backend.src.database import Database

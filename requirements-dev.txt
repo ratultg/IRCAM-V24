@@ -1,5 +1,22 @@
+pip-requirements
+# Frontend development tools
+# (install with pipx or in a separate frontend venv if using Node.js for React)
+
+# Linting, formatting, and type checking (Python)
 pytest
 pytest-asyncio
 flake8
 black
 mypy
+
+# Frontend (Node.js-based, install via npm/yarn in frontend directory):
+# - jest
+# - @testing-library/react
+# - cypress
+# - storybook
+# - eslint
+# - prettier
+# - typescript
+# - react-scripts
+# - @types/*
+# (see frontend package.json for actual dependencies)

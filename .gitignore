@@ -104,3 +104,4 @@ Desktop.ini
 
 # Ignore wheel files
 *.whl
+node_modules
