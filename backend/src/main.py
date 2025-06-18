@@ -1,4 +1,7 @@
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Path
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from typing import List, Optional
@@ -18,6 +21,26 @@ import csv
 load_dotenv()
 
 app = FastAPI(title="IR Thermal Monitoring API", version="1.0")
+
+# CORS middleware must be added before any other middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins temporarily for debugging
+    allow_credentials=False,  # Set to False when using allow_origins=["*"]
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=86400,  # Cache preflight requests for 24 hours
+)
+
+# Add response middleware to ensure CORS headers are always present
+@app.middleware("http")
+async def add_cors_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 # --- Argument Parsing ---
 def parse_args() -> tuple[argparse.Namespace, list[str]]:
@@ -47,6 +70,16 @@ def get_alarm_manager(db: Database = Depends(get_db)) -> AlarmManager:
 # --- Pydantic Models ---
 class ZoneRequest(BaseModel):
     id: int
+    x: int
+    y: int
+    width: int
+    height: int
+    name: Optional[str] = None
+    color: Optional[str] = None
+    enabled: Optional[bool] = True
+    threshold: Optional[float] = None
+
+class ZoneUpdateRequest(BaseModel):
     x: int
     y: int
     width: int
@@ -197,6 +230,17 @@ def add_zone(zone: ZoneRequest, zones_manager: ZonesManager = Depends(get_zones_
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         logging.exception("Error in add_zone")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/v1/zones/{zone_id}", response_model=ZoneResponse)
+def update_zone(zone_id: int, zone: ZoneUpdateRequest, zones_manager: ZonesManager = Depends(get_zones_manager)) -> ZoneResponse:
+    try:
+        zones_manager.update_zone(zone_id, zone.x, zone.y, zone.width, zone.height, zone.name, zone.color, zone.enabled, zone.threshold)
+        return ZoneResponse(id=zone_id, x=zone.x, y=zone.y, width=zone.width, height=zone.height, name=zone.name or f"Zone ({zone.x},{zone.y})", color=zone.color or "#FF0000", enabled=zone.enabled, threshold=zone.threshold)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logging.exception("Error in update_zone")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/v1/zones/{zone_id}")

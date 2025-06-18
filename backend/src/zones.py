@@ -101,3 +101,18 @@ class ZonesManager:
         except Exception as e:
             logging.error("Error computing average for zone %d: %s", zone_id, e, exc_info=True)
             raise
+
+    def update_zone(self, zone_id: int, x: int, y: int, width: int, height: int, name: str | None = None, color: str | None = None, enabled: bool = True, threshold: float | None = None) -> None:
+        try:
+            if zone_id not in self.zones:
+                logging.error("Zone ID %d does not exist.", zone_id)
+                raise ValueError("Zone ID does not exist.")
+            self.db.execute_query(
+                "UPDATE zones SET x=?, y=?, width=?, height=?, name=?, color=?, enabled=?, threshold=? WHERE id=?",
+                (x, y, width, height, name or f"Zone ({x},{y})", color or "#FF0000", int(enabled), threshold, zone_id)
+            )
+            self.zones[zone_id] = Zone(zone_id, x, y, width, height, name, color, enabled, threshold)
+            logging.info("Zone %d updated with name '%s', color '%s', enabled %s, threshold %s.", zone_id, name, color, enabled, threshold)
+        except Exception as e:
+            logging.error("Error updating zone %d: %s", zone_id, e, exc_info=True)
+            raise
