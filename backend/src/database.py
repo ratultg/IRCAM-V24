@@ -19,13 +19,86 @@ class Database:
 
     def connect(self) -> None:
         """Open a connection to the SQLite database and apply PRAGMA settings."""
-        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        if self.conn is None:
+            self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+            assert self.conn is not None
+            self.conn.row_factory = sqlite3.Row
+            # Enable WAL mode and other performance optimizations
+            self.conn.execute("PRAGMA journal_mode=WAL;")
+            self.conn.execute("PRAGMA synchronous=NORMAL;")
+            self.conn.execute("PRAGMA cache_size=10000;")
+            self.conn.execute("PRAGMA temp_store=MEMORY;")
+            logging.info("Database connected and PRAGMA set.")
+
+    def initialize_default_settings(self) -> None:
+        """Initialize default settings if they don't exist."""
+        default_settings = [
+            {
+                "key": "temperature_unit",
+                "value": "celsius",
+                "description": "Temperature unit (celsius/fahrenheit)"
+            },
+            {
+                "key": "frame_buffer_minutes",
+                "value": "10",
+                "description": "Number of minutes to keep frames in buffer"
+            },
+            {
+                "key": "email_notifications_enabled",
+                "value": "false",
+                "description": "Enable/disable email notifications for alarms"
+            },
+            {
+                "key": "notification_email",
+                "value": "",
+                "description": "Email address for alarm notifications"
+            },
+            {
+                "key": "global_alarm_cooldown",
+                "value": "300",
+                "description": "Global cooldown period (seconds) between alarm triggers"
+            },
+            {
+                "key": "default_zone_threshold",
+                "value": "40.0",
+                "description": "Default temperature threshold for new zones (Celsius)"
+            },
+            {
+                "key": "capture_interval",
+                "value": "1",
+                "description": "Interval between temperature captures (seconds)"
+            },
+            {
+                "key": "data_retention_days",
+                "value": "30",
+                "description": "Number of days to keep historical data"
+            }
+        ]
+        
+        for setting in default_settings:
+            try:
+                # Only set if the setting doesn't already exist
+                if not self.get_setting(setting["key"]):
+                    self.set_setting(
+                        setting["key"],
+                        setting["value"],
+                        setting["description"]
+                    )
+            except Exception as e:
+                logging.error(f"Error setting default setting {setting['key']}: {str(e)}")
+
+    @contextmanager
+    def get_connection(self) -> Iterator[sqlite3.Connection]:
+        """Get a database connection with automatic commit/rollback."""
+        if self.conn is None:
+            self.connect()
         assert self.conn is not None
-        self.conn.execute("PRAGMA journal_mode=WAL;")
-        self.conn.execute("PRAGMA synchronous=NORMAL;")
-        self.conn.execute("PRAGMA cache_size=10000;")
-        self.conn.execute("PRAGMA temp_store=MEMORY;")
-        logging.info("Database connected and PRAGMA set.")
+        try:
+            yield self.conn
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
 
     def initialize_schema(self) -> None:
         """Create all required tables and indexes if they do not exist."""
@@ -100,6 +173,8 @@ class Database:
         assert self.conn is not None
         self.conn.executescript(schema)
         self.conn.commit()
+        # Initialize default settings after schema creation
+        self.initialize_default_settings()
         logging.info("Database schema initialized.")
 
     @contextmanager

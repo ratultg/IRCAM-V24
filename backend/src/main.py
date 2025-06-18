@@ -28,9 +28,14 @@ def parse_args() -> tuple[argparse.Namespace, list[str]]:
 args, _ = parse_args()
 
 # --- Database and Managers ---
+db = Database()
+
 def get_db() -> Database:
-    db = Database()
-    db.connect()
+    """Get database instance with initialized schema."""
+    if not hasattr(get_db, 'initialized'):
+        db.connect()
+        db.initialize_schema()
+        get_db.initialized = True
     return db
 
 def get_zones_manager(db: Database = Depends(get_db)) -> ZonesManager:

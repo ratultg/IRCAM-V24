@@ -13,6 +13,8 @@ venv/
 
 # SQLite DB
 *.db
+*.db-shm
+*.db-wal
 
 # Node/Angular/React
 node_modules/
