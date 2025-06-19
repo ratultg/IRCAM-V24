@@ -1,0 +1,17 @@
+[Unit]
+Description=IRCAM V24 Health Monitor
+After=ircam.service
+Requires=ircam.service
+
+[Service]
+Type=simple
+User=ircam
+Group=ircam
+WorkingDirectory=/opt/ircam-v24
+Environment="PATH=/opt/ircam-v24/.venv/bin:$PATH"
+ExecStart=/opt/ircam-v24/.venv/bin/python3 /opt/ircam-v24/health_check.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

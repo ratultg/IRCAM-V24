@@ -1,0 +1,17 @@
+[Unit]
+Description=IRCAM V24 Thermal Monitoring System
+After=network.target
+
+[Service]
+Type=simple
+User=ircam
+Group=ircam
+WorkingDirectory=/opt/ircam-v24
+Environment="MOCK_SENSOR=0"
+Environment="PATH=/opt/ircam-v24/.venv/bin:$PATH"
+ExecStart=/opt/ircam-v24/.venv/bin/uvicorn backend.src.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
